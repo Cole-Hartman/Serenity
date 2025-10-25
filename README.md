@@ -112,13 +112,6 @@ When the system detects high stress (high beta/low alpha), Serenity Mode automat
 | **Audio** | [Howler.js](https://github.com/goldfire/howler.js) | Adaptive sound feedback |
 | **3D Brain Model (Optional)** | [BrainBrowser](https://brainbrowser.cbrain.mcgill.ca/) | Visual 3D rendering of brain activity |
 
----
-
-## 🧾 Research Inspiration
-
-- [Duet Project – CalHacks Previous Winner](https://www.notion.so/PREV-WINNER-DUET-293a6df2ddb580c88f8fe7b528068d2e?pvs=21)  
-- [Visual Stimulation for Autism (PMC8217662)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8217662/)  
-- Studies on Alpha/Beta wave correlations with anxiety and sensory overload  
 
 ---
 
