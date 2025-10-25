@@ -191,12 +191,10 @@ export default function BrainStressDemo() {
                   }
                   viewer.updateColors();
 
-                  function paint(mode: RegionMode, value01: number) {
+                  // Reset brain to baseline activity distribution
+                  function resetToBaseline() {
                     if (!intensity_data || !intensity_data.values) return;
 
-                    console.log(`Painting mode: ${mode}, intensity: ${value01.toFixed(2)}`);
-
-                    // Reset to baseline activity distribution
                     for (let k = 0; k < n; k++) {
                       const x = positions[3*k + 0];
                       const y = positions[3*k + 1];
@@ -209,74 +207,69 @@ export default function BrainStressDemo() {
 
                       intensity_data.values[k] = baseActivity;
                     }
+                  }
 
-                    // Highlight specific electrode regions based on Muse 2 positions
-                    if (mode !== "global") {
-                      let highlightedCount = 0;
+                  // Paint a specific region with stress intensity
+                  function paintRegion(mode: RegionMode, value01: number) {
+                    if (!intensity_data || !intensity_data.values || mode === "global") return;
 
-                      for (let k = 0; k < n; k++) {
-                        const x = positions[3*k + 0];
-                        const y = positions[3*k + 1];
-                        const z = positions[3*k + 2];
+                    console.log(`Painting ${mode}: ${value01.toFixed(2)}`);
 
-                        // Calculate distance from electrode position
-                        let inRegion = false;
-                        const RADIUS = 30; // Localized influence radius
+                    let highlightedCount = 0;
+                    const RADIUS = 30; // Localized influence radius
 
-                        if (mode === "AF7") {
-                          // Left frontal (above left eye) - x > 0 (left), y > 0 (front), z > 0 (upper)
-                          const centerX = 35, centerY = 55, centerZ = 30;
-                          const dist = Math.sqrt(
-                            Math.pow(x - centerX, 2) +
-                            Math.pow(y - centerY, 2) +
-                            Math.pow(z - centerZ, 2)
-                          );
-                          inRegion = dist < RADIUS;
-                        }
+                    for (let k = 0; k < n; k++) {
+                      const x = positions[3*k + 0];
+                      const y = positions[3*k + 1];
+                      const z = positions[3*k + 2];
 
-                        if (mode === "AF8") {
-                          // Right frontal (above right eye) - x < 0 (right), y > 0 (front), z > 0 (upper)
-                          const centerX = -35, centerY = 55, centerZ = 30;
-                          const dist = Math.sqrt(
-                            Math.pow(x - centerX, 2) +
-                            Math.pow(y - centerY, 2) +
-                            Math.pow(z - centerZ, 2)
-                          );
-                          inRegion = dist < RADIUS;
-                        }
+                      let inRegion = false;
 
-                        if (mode === "TP9") {
-                          // Left temporal (behind left ear) - x > 0 (left), y < 0 (back), z ~ 0 (side)
-                          const centerX = 65, centerY = -10, centerZ = 0;
-                          const dist = Math.sqrt(
-                            Math.pow(x - centerX, 2) +
-                            Math.pow(y - centerY, 2) +
-                            Math.pow(z - centerZ, 2)
-                          );
-                          inRegion = dist < RADIUS;
-                        }
-
-                        if (mode === "TP10") {
-                          // Right temporal (behind right ear) - x < 0 (right), y < 0 (back), z ~ 0 (side)
-                          const centerX = -65, centerY = -10, centerZ = 0;
-                          const dist = Math.sqrt(
-                            Math.pow(x - centerX, 2) +
-                            Math.pow(y - centerY, 2) +
-                            Math.pow(z - centerZ, 2)
-                          );
-                          inRegion = dist < RADIUS;
-                        }
-
-                        if (inRegion) {
-                          // Blend from baseline to high stress based on value01
-                          intensity_data.values[k] = 75.5 + BASELINE_ACTIVITY + (HIGH_STRESS - BASELINE_ACTIVITY) * value01;
-                          highlightedCount++;
-                        }
+                      if (mode === "AF7") {
+                        // Left frontal (above left eye)
+                        const centerX = 35, centerY = 55, centerZ = 30;
+                        const dist = Math.sqrt(
+                          Math.pow(x - centerX, 2) +
+                          Math.pow(y - centerY, 2) +
+                          Math.pow(z - centerZ, 2)
+                        );
+                        inRegion = dist < RADIUS;
+                      } else if (mode === "AF8") {
+                        // Right frontal (above right eye)
+                        const centerX = -35, centerY = 55, centerZ = 30;
+                        const dist = Math.sqrt(
+                          Math.pow(x - centerX, 2) +
+                          Math.pow(y - centerY, 2) +
+                          Math.pow(z - centerZ, 2)
+                        );
+                        inRegion = dist < RADIUS;
+                      } else if (mode === "TP9") {
+                        // Left temporal (behind left ear)
+                        const centerX = 65, centerY = -10, centerZ = 0;
+                        const dist = Math.sqrt(
+                          Math.pow(x - centerX, 2) +
+                          Math.pow(y - centerY, 2) +
+                          Math.pow(z - centerZ, 2)
+                        );
+                        inRegion = dist < RADIUS;
+                      } else if (mode === "TP10") {
+                        // Right temporal (behind right ear)
+                        const centerX = -65, centerY = -10, centerZ = 0;
+                        const dist = Math.sqrt(
+                          Math.pow(x - centerX, 2) +
+                          Math.pow(y - centerY, 2) +
+                          Math.pow(z - centerZ, 2)
+                        );
+                        inRegion = dist < RADIUS;
                       }
-                      console.log(`Highlighted ${highlightedCount} vertices in ${mode} region`);
-                    }
 
-                    viewer.updateColors();
+                      if (inRegion) {
+                        // Blend from baseline to high stress based on value01
+                        intensity_data.values[k] = 75.5 + BASELINE_ACTIVITY + (HIGH_STRESS - BASELINE_ACTIVITY) * value01;
+                        highlightedCount++;
+                      }
+                    }
+                    console.log(`Highlighted ${highlightedCount} vertices in ${mode} region`);
                   }
 
                   // Simulate Muse 2 electrode activity with mock data
@@ -291,20 +284,33 @@ export default function BrainStressDemo() {
                     const tp9Stress = 0.5 + 0.35 * Math.sin(t * 0.4); // Left temporal
                     const tp10Stress = 0.5 + 0.25 * Math.cos(t * 0.6); // Right temporal
 
-                    // Light up the electrode with highest stress
-                    const maxStress = Math.max(af7Stress, af8Stress, tp9Stress, tp10Stress);
+                    // Reset to baseline first
+                    resetToBaseline();
 
-                    if (af7Stress === maxStress && af7Stress > 0.65) {
-                      paint("AF7", af7Stress);
-                    } else if (af8Stress === maxStress && af8Stress > 0.65) {
-                      paint("AF8", af8Stress);
-                    } else if (tp9Stress === maxStress && tp9Stress > 0.6) {
-                      paint("TP9", tp9Stress);
-                    } else if (tp10Stress === maxStress && tp10Stress > 0.6) {
-                      paint("TP10", tp10Stress);
-                    } else {
-                      // Show baseline when no significant stress
-                      paint("global", 0);
+                    // Track if any region is above threshold
+                    let anyActive = false;
+
+                    // Paint ALL regions that exceed their stress thresholds
+                    if (af7Stress > 0.65) {
+                      paintRegion("AF7", af7Stress);
+                      anyActive = true;
+                    }
+                    if (af8Stress > 0.65) {
+                      paintRegion("AF8", af8Stress);
+                      anyActive = true;
+                    }
+                    if (tp9Stress > 0.6) {
+                      paintRegion("TP9", tp9Stress);
+                      anyActive = true;
+                    }
+                    if (tp10Stress > 0.6) {
+                      paintRegion("TP10", tp10Stress);
+                      anyActive = true;
+                    }
+
+                    // Update colors once after painting all regions
+                    if (anyActive) {
+                      viewer.updateColors();
                     }
                   }, 800);
 
