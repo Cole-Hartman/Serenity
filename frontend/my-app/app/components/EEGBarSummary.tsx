@@ -116,8 +116,8 @@ export default function EEGBarSummary() {
 					<button
 						onClick={() => setMode('live')}
 						className={`px-3 py-1 rounded-md text-sm ${mode === 'live'
-								? 'bg-purple-600 text-white'
-								: 'bg-neutral-800 text-gray-400'
+							? 'bg-purple-600 text-white'
+							: 'bg-neutral-800 text-gray-400'
 							}`}
 					>
 						Live
@@ -125,8 +125,8 @@ export default function EEGBarSummary() {
 					<button
 						onClick={() => setMode('past')}
 						className={`px-3 py-1 rounded-md text-sm ${mode === 'past'
-								? 'bg-purple-600 text-white'
-								: 'bg-neutral-800 text-gray-400'
+							? 'bg-purple-600 text-white'
+							: 'bg-neutral-800 text-gray-400'
 							}`}
 					>
 						Past

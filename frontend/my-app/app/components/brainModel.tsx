@@ -1,9 +1,13 @@
-"use client";
+'use client'
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-declare global { interface Window { BrainBrowser: any } }
+declare global {
+	interface Window {
+		BrainBrowser: any
+	}
+}
 
 type RegionMode = "global" | "AF7" | "AF8" | "TP9" | "TP10";
 
@@ -77,17 +81,9 @@ export default function BrainStressDemo() {
 
         BrainBrowser.SurfaceViewer.start("brainbrowser-container", (viewer: any) => {
           // Add event listeners
-          viewer.addEventListener("displaymodel", () => {
-            console.log("Model displayed!");
-          });
-
-          viewer.addEventListener("loadintensitydata", () => {
-            console.log("Intensity data loaded!");
-          });
-
-          viewer.addEventListener("changeintensityrange", () => {
-            console.log("Intensity range changed!");
-          });
+          viewer.addEventListener("displaymodel");
+          viewer.addEventListener("loadintensitydata")
+          viewer.addEventListener("changeintensityrange");
 
           // Start rendering
           viewer.render();
@@ -100,13 +96,8 @@ export default function BrainStressDemo() {
             format: "mniobj",
             complete: function() {
               // Load intensity data
-              console.log("Loading intensity data...");
               viewer.loadIntensityDataFromURL("/brain/atlas-values.txt", {
                 complete: function() {
-                  console.log("Intensity data load complete!");
-                  console.log("Brain visualization ready!");
-                  console.log("Viewer model:", viewer.model);
-                  console.log("Viewer model_data:", viewer.model_data);
 
                   // Setup animation
                   // Get the first shape from the model
@@ -130,16 +121,13 @@ export default function BrainStressDemo() {
                     return;
                   }
 
-                  console.log("Intensity data array length:", intensity_data.values?.length);
-
                   // Store original intensity values for restoration
                   const originalValues = new Float32Array(intensity_data.values);
 
                   // Auto-rotation setup with BrainBrowser's built-in autorotate
                   let rotationPauseTimeout: NodeJS.Timeout | null = null;
-                  const PAUSE_DURATION = 2000; // Resume rotation after 2 seconds of inactivity
+                  const PAUSE_DURATION = 2000;
 
-                  // Enable auto-rotation with multi-axis rotation for dynamic movement
                   // BrainBrowser autorotate uses boolean flags for each axis
                   viewer.autorotate.x = true;  // Rotate around X axis (up/down tilt)
                   viewer.autorotate.y = true;  // Rotate around Y axis (left/right spin)
@@ -185,10 +173,10 @@ export default function BrainStressDemo() {
 
                   container.addEventListener("mousedown", pauseRotation);
                   container.addEventListener("mouseup", resumeRotation);
-                  container.addEventListener("mouseleave", resumeRotation); // Resume when cursor leaves
+                  container.addEventListener("mouseleave", resumeRotation);
                   container.addEventListener("touchstart", pauseRotation);
                   container.addEventListener("touchend", resumeRotation);
-                  container.addEventListener("touchcancel", resumeRotation); // Resume if touch cancelled
+                  container.addEventListener("touchcancel", resumeRotation);
 
                   // Also listen globally for mouseup in case user releases outside container
                   const globalMouseUp = () => {
@@ -247,8 +235,6 @@ export default function BrainStressDemo() {
                   function paintRegion(mode: RegionMode, value01: number) {
                     if (!intensity_data || !intensity_data.values || mode === "global") return;
 
-                    console.log(`Painting ${mode}: ${value01.toFixed(2)}`);
-
                     let highlightedCount = 0;
                     const RADIUS = 30; // Localized influence radius
 
@@ -303,7 +289,6 @@ export default function BrainStressDemo() {
                         highlightedCount++;
                       }
                     }
-                    console.log(`Highlighted ${highlightedCount} vertices in ${mode} region`);
                   }
 
                   // Function to update brain visualization based on current electrode stress levels
@@ -316,8 +301,6 @@ export default function BrainStressDemo() {
                     // Use ref to get latest state (avoids stale closure)
                     const currentStress = electrodeStressRef.current;
 
-                    console.log('Updating visualization, current stress:', currentStress);
-
                     // Paint each electrode region with fade-out based on time since last update
                     Object.entries(currentStress).forEach(([electrodeName, data]) => {
                       const timeSinceUpdate = now - data.lastUpdate;
@@ -329,8 +312,6 @@ export default function BrainStressDemo() {
 
                         // Apply fade to intensity
                         const fadedIntensity = data.intensity * fadeFactor;
-
-                        console.log(`${electrodeName}: intensity=${data.intensity.toFixed(2)}, fade=${fadeFactor.toFixed(2)}, final=${fadedIntensity.toFixed(2)}`);
 
                         // Only paint if intensity is significant
                         if (fadedIntensity > 0.1) {
@@ -359,8 +340,6 @@ export default function BrainStressDemo() {
                         table: 'electrode_data'
                       },
                       (payload) => {
-                        console.log('Electrode data update:', payload);
-
                         if (payload.new && typeof payload.new === 'object') {
                           const data = payload.new as ElectrodeData;
                           const electrodeName = data.electrode_name;
@@ -373,15 +352,10 @@ export default function BrainStressDemo() {
                               lastUpdate: Date.now()
                             }
                           }));
-
-                          console.log(`${electrodeName}: stress=${data.stress_intensity.toFixed(2)}, ratio=${data.beta_alpha_ratio.toFixed(2)}`);
                         }
                       }
                     )
                     .subscribe();
-
-                  console.log("Subscribed to electrode_data realtime updates");
-
                   viewer.addEventListener("destroy", () => {
                     // Clean up animation timer
                     clearInterval(animationTimer);
@@ -418,17 +392,16 @@ export default function BrainStressDemo() {
     return () => { /* nothing to cleanup; scripts left in DOM is fine in dev */ };
   }, []);
 
-  return (
-    <div
-      id="brainbrowser-container"
-      ref={ref}
-      style={{
-        width: "100%",
-        height: "80vh",
-        border: "1px solid #333",
-        borderRadius: "8px",
-        overflow: "hidden"
-      }}
-    />
-  );
+	return (
+		<div
+			id="brainbrowser-container"
+			ref={ref}
+			className="w-full h-full rounded-xl border border-neutral-800 overflow-hidden bg-neutral-950"
+			style={{
+				minHeight: '200px', // prevents collapse
+				maxHeight: '100%', // ensures it never overflows its grid cell
+			}}
+		/>
+	)
 }
+

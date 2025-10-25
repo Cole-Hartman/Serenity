@@ -9,7 +9,6 @@ import {
 	CartesianGrid,
 	Tooltip,
 	Legend,
-	ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -22,133 +21,119 @@ interface EEGSample {
 
 export default function EEGChart() {
 	const [data, setData] = useState<EEGSample[]>([])
-	const [visibleRange, setVisibleRange] = useState(60)
+	const [visibleRange, setVisibleRange] = useState(60 * 5) // default: 5 minutes
+	const [rangeUnit, setRangeUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('minutes')
 	const [mode, setMode] = useState<'live' | 'past'>('live')
-	const [timeWindow, setTimeWindow] = useState('1h') // '10m', '30m', '1h', '6h', '12h', '24h', '3d', '7d'
 
+	// --- Fetch initial + stream data ---
 	useEffect(() => {
-		let channel: any
-
 		const fetchInitial = async () => {
-			if (mode === 'live') {
-				// Fetch most recent data
-				const { data: rows, error } = await supabase
-					.from('brain_data')
-					.select('*')
-					.order('id', { ascending: false })
-					.limit(1000)
+			const { data: rows, error } = await supabase
+				.from('brain_data')
+				.select('*')
+				.order('id', { ascending: false })
+				.limit(5000)
 
-				if (error) {
-					console.error('Supabase error:', error)
-					return
-				}
+			if (error) {
+				console.error('Supabase error:', error)
+				return
+			}
 
-				if (rows?.length) {
-					const formatted = rows.reverse().map((r) => ({
-						timestamp: new Date(r.created_at ?? Date.now()).getTime(),
-						alpha: r.alpha ?? 0,
-						beta: r.beta ?? 0,
-						beta_alpha_ratio: r.beta_alpha_ratio ?? 0,
-					}))
-					setData(formatted)
-				}
-
-				// Subscribe for live inserts
-				channel = supabase
-					.channel('brain_data_stream')
-					.on(
-						'postgres_changes',
-						{ event: 'INSERT', schema: 'public', table: 'brain_data' },
-						(payload) => {
-							const record = payload.new as any
-							const ts = new Date(record.created_at ?? Date.now()).getTime()
-							setData((prev) => [
-								...prev.slice(-500),
-								{
-									timestamp: ts,
-									alpha: record.alpha ?? 0,
-									beta: record.beta ?? 0,
-									beta_alpha_ratio: record.beta_alpha_ratio ?? 0,
-								},
-							])
-						}
-					)
-					.subscribe()
-			} else {
-				// Fetch past data based on selected window
-				const now = new Date()
-				let start = new Date(now)
-				switch (timeWindow) {
-					case '10m':
-						start.setMinutes(now.getMinutes() - 10)
-						break
-					case '30m':
-						start.setMinutes(now.getMinutes() - 30)
-						break
-					case '1h':
-						start.setHours(now.getHours() - 1)
-						break
-					case '6h':
-						start.setHours(now.getHours() - 6)
-						break
-					case '12h':
-						start.setHours(now.getHours() - 12)
-						break
-					case '24h':
-						start.setDate(now.getDate() - 1)
-						break
-					case '3d':
-						start.setDate(now.getDate() - 3)
-						break
-					case '7d':
-						start.setDate(now.getDate() - 7)
-						break
-				}
-
-				const { data: rows, error } = await supabase
-					.from('brain_data')
-					.select('*')
-					.gte('created_at', start.toISOString())
-					.order('created_at', { ascending: true })
-
-				if (error) {
-					console.error('Supabase error:', error)
-					return
-				}
-
-				if (rows?.length) {
-					const formatted = rows.map((r) => ({
-						timestamp: new Date(r.created_at ?? Date.now()).getTime(),
-						alpha: r.alpha ?? 0,
-						beta: r.beta ?? 0,
-						beta_alpha_ratio: r.beta_alpha_ratio ?? 0,
-					}))
-					setData(formatted)
-				}
+			if (rows?.length) {
+				const formatted = rows.reverse().map((r) => ({
+					timestamp: new Date(r.created_at ?? Date.now()).getTime(),
+					alpha: r.alpha ?? 0,
+					beta: r.beta ?? 0,
+					beta_alpha_ratio: r.beta_alpha_ratio ?? 0,
+				}))
+				setData(formatted)
 			}
 		}
 
 		fetchInitial()
-		return () => {
-			if (channel) supabase.removeChannel(channel)
-		}
-	}, [mode, timeWindow])
 
+		const channel = supabase
+			.channel('brain_data_stream')
+			.on(
+				'postgres_changes',
+				{ event: 'INSERT', schema: 'public', table: 'brain_data' },
+				(payload) => {
+					const record = payload.new as any
+					const ts = new Date(record.created_at ?? Date.now()).getTime()
+					setData((prev) => [
+						...prev.slice(-5000),
+						{
+							timestamp: ts,
+							alpha: record.alpha ?? 0,
+							beta: record.beta ?? 0,
+							beta_alpha_ratio: record.beta_alpha_ratio ?? 0,
+						},
+					])
+				}
+			)
+			.subscribe()
+
+		return () => {
+			supabase.removeChannel(channel)
+		}
+	}, [])
+
+	// --- Time range computation ---
 	const now = Date.now()
-	const minTime = now - visibleRange * 1000
-	const filtered = mode === 'live' ? data.filter((d) => d.timestamp >= minTime) : data
+
+	const rangeMs = (() => {
+		switch (rangeUnit) {
+			case 'seconds':
+				return visibleRange * 1000
+			case 'minutes':
+				return visibleRange * 60 * 1000
+			case 'hours':
+				return visibleRange * 60 * 60 * 1000
+			case 'days':
+				return visibleRange * 24 * 60 * 60 * 1000
+			default:
+				return visibleRange * 1000
+		}
+	})()
+
+	const minTime = now - rangeMs
+	let filtered = data.filter((d) => d.timestamp >= minTime)
+
+	// --- If no EEG data, show a flat baseline ---
+	const noData = filtered.length === 0
+	if (noData) {
+		const now = Date.now()
+		filtered = Array.from({ length: 50 }, (_, i) => ({
+			timestamp: now - (50 - i) * 1000,
+			alpha: 0,
+			beta: 0,
+			beta_alpha_ratio: 0,
+		}))
+	}
+
+	// --- Helper for label ---
+	function formatRangeLabel() {
+		switch (rangeUnit) {
+			case 'seconds':
+				return `${visibleRange}s`
+			case 'minutes':
+				return `${visibleRange}m`
+			case 'hours':
+				return `${visibleRange}h`
+			case 'days':
+				return `${visibleRange}d`
+		}
+	}
 
 	return (
-		<div className="w-full bg-neutral-950 rounded-xl p-4 shadow-md border border-neutral-800">
-			<div className="flex flex-col sm:flex-row items-center justify-between mb-3">
-				<h2 className="text-lg text-gray-200 mb-2 sm:mb-0">
-					EEG Activity (Alpha / Beta / Ratio)
-				</h2>
-
-				<div className="flex items-center gap-2">
+		<div className="w-full h-full flex flex-col bg-neutral-950 rounded-xl border border-neutral-800 p-3 relative">
+			{/* Header */}
+			<div className="flex justify-between items-center mb-2">
+				<h2 className="text-sm text-gray-300">EEG Activity (α / β / Ratio)</h2>
+				<div className="flex gap-2">
 					<button
 						onClick={() => setMode('live')}
-						className={`px-3 py-1 rounded-md text-sm ${mode === 'live'
+						className={`px-2 py-1 text-xs rounded-md ${mode === 'live'
 							? 'bg-purple-600 text-white'
 							: 'bg-neutral-800 text-gray-400'
 							}`}
@@ -157,37 +142,33 @@ export default function EEGChart() {
 					</button>
 					<button
 						onClick={() => setMode('past')}
-						className={`px-3 py-1 rounded-md text-sm ${mode === 'past'
+						className={`px-2 py-1 text-xs rounded-md ${mode === 'past'
 							? 'bg-purple-600 text-white'
 							: 'bg-neutral-800 text-gray-400'
 							}`}
 					>
 						Past
 					</button>
-
-					{mode === 'past' && (
-						<select
-							value={timeWindow}
-							onChange={(e) => setTimeWindow(e.target.value)}
-							className="bg-neutral-900 text-gray-300 text-sm rounded-md px-2 py-1 border border-neutral-700"
-						>
-							<option value="10m">Last 10 m</option>
-							<option value="30m">Last 30 m</option>
-							<option value="1h">Last 1 h</option>
-							<option value="6h">Last 6 h</option>
-							<option value="12h">Last 12 h</option>
-							<option value="24h">Last 24 h</option>
-							<option value="3d">Last 3 d</option>
-							<option value="7d">Last 7 d</option>
-						</select>
-					)}
 				</div>
 			</div>
 
-			<ResponsiveContainer width="100%" height={400}>
+			{/* Chart */}
+			<div className="flex-1 flex items-center justify-center overflow-hidden relative">
+				{noData && (
+					<p className="absolute text-xs text-gray-500 top-2 right-4 italic z-10">
+						No live data — displaying flat baseline
+					</p>
+				)}
+
 				<LineChart
 					data={filtered}
-					margin={{ top: 8, right: 16, bottom: 24, left: 48 }}
+					style={{
+						width: '100%',
+						maxWidth: '450px',
+						maxHeight: '70vh',
+						aspectRatio: 1.6,
+					}}
+					margin={{ top: 8, right: 12, bottom: 20, left: 0 }}
 				>
 					<CartesianGrid strokeDasharray="3 3" stroke="#333" />
 					<XAxis
@@ -195,9 +176,11 @@ export default function EEGChart() {
 						dataKey="timestamp"
 						domain={['dataMin', 'dataMax']}
 						tickFormatter={(t) =>
-							new Date(t)
-								.toLocaleTimeString('en-US', { hour12: false })
-								.slice(3, 8)
+							new Date(t).toLocaleTimeString('en-US', {
+								hour12: false,
+								hour: '2-digit',
+								minute: '2-digit',
+							})
 						}
 						stroke="#666"
 					/>
@@ -221,12 +204,11 @@ export default function EEGChart() {
 						]}
 					/>
 					<Legend />
-
 					<Line
 						yAxisId="left"
 						type="monotone"
 						dataKey="alpha"
-						stroke="#7b61ff"
+						stroke={noData ? '#7b61ff33' : '#7b61ff'}
 						dot={false}
 						strokeWidth={2}
 						name="Alpha"
@@ -235,7 +217,7 @@ export default function EEGChart() {
 						yAxisId="left"
 						type="monotone"
 						dataKey="beta"
-						stroke="#00ffa3"
+						stroke={noData ? '#00ffa333' : '#00ffa3'}
 						dot={false}
 						strokeWidth={2}
 						name="Beta"
@@ -244,30 +226,52 @@ export default function EEGChart() {
 						yAxisId="left"
 						type="monotone"
 						dataKey="beta_alpha_ratio"
-						stroke="#ff7300"
+						stroke={noData ? '#ff730033' : '#ff7300'}
 						dot={false}
 						strokeWidth={2}
 						name="β/α Ratio"
 					/>
 				</LineChart>
-			</ResponsiveContainer>
+			</div>
 
-			{mode === 'live' && (
-				<div className="flex flex-col items-center mt-4 text-gray-300">
-					<label className="mb-2 text-sm">
-						Visible Time Range: {visibleRange}s
-					</label>
-					<input
-						type="range"
-						min="10"
-						max="300"
-						step="10"
-						value={visibleRange}
-						onChange={(e) => setVisibleRange(Number(e.target.value))}
-						className="w-2/3 accent-purple-500"
-					/>
+			{/* Range Controls */}
+			<div className="flex flex-col items-center mt-2 text-gray-300">
+				<label className="mb-1 text-xs">Visible Range: {formatRangeLabel()}</label>
+
+				<input
+					type="range"
+					min="1"
+					max={
+						rangeUnit === 'seconds'
+							? 300
+							: rangeUnit === 'minutes'
+								? 120
+								: rangeUnit === 'hours'
+									? 48
+									: 7
+					}
+					step="1"
+					value={visibleRange}
+					onChange={(e) => setVisibleRange(Number(e.target.value))}
+					className="w-2/3 accent-purple-500 mb-2"
+				/>
+
+				{/* Unit Toggle */}
+				<div className="flex gap-2 text-xs">
+					{(['seconds', 'minutes', 'hours', 'days'] as const).map((u) => (
+						<button
+							key={u}
+							onClick={() => setRangeUnit(u)}
+							className={`px-2 py-1 rounded-md ${rangeUnit === u
+								? 'bg-purple-600 text-white'
+								: 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
+								}`}
+						>
+							{u[0].toUpperCase() + u.slice(1)}
+						</button>
+					))}
 				</div>
-			)}
+			</div>
 		</div>
 	)
 }
