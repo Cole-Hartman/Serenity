@@ -32,6 +32,14 @@ export default function BrainStressDemo() {
     TP10: { intensity: 0, lastUpdate: 0 }
   });
 
+  // Use ref to always have access to latest state in closures
+  const electrodeStressRef = useRef(electrodeStress);
+
+  // Update ref whenever state changes
+  useEffect(() => {
+    electrodeStressRef.current = electrodeStress;
+  }, [electrodeStress]);
+
   // Fade duration in milliseconds
   const FADE_DURATION = 8000; // 8 seconds fade out
 
@@ -193,7 +201,7 @@ export default function BrainStressDemo() {
                   // Realistic brain activity baseline - most of brain has low-moderate activity
                   const BASELINE_ACTIVITY = 10;     // Resting brain regions (gray-blue)
                   const NORMAL_ACTIVITY = 20;      // Default active regions (light blue-green)
-                  const HIGH_STRESS = 0.85;          // High stress/beta activity (red)
+                  const HIGH_STRESS = 130;          // High stress/beta activity (red) - maps to upper end of color scale
 
                   // Initialize brain with realistic baseline activity distribution
                   for (let k = 0; k < n; k++) {
@@ -291,7 +299,7 @@ export default function BrainStressDemo() {
 
                       if (inRegion) {
                         // Blend from baseline to high stress based on value01
-                        intensity_data.values[k] = 75.5 + BASELINE_ACTIVITY + (HIGH_STRESS - BASELINE_ACTIVITY) * value01;
+                        intensity_data.values[k] = BASELINE_ACTIVITY + (HIGH_STRESS - BASELINE_ACTIVITY) * value01;
                         highlightedCount++;
                       }
                     }
@@ -305,11 +313,13 @@ export default function BrainStressDemo() {
                     // Reset to baseline first
                     resetToBaseline();
 
-                    // Track if any region is active
-                    let anyActive = false;
+                    // Use ref to get latest state (avoids stale closure)
+                    const currentStress = electrodeStressRef.current;
+
+                    console.log('Updating visualization, current stress:', currentStress);
 
                     // Paint each electrode region with fade-out based on time since last update
-                    Object.entries(electrodeStress).forEach(([electrodeName, data]) => {
+                    Object.entries(currentStress).forEach(([electrodeName, data]) => {
                       const timeSinceUpdate = now - data.lastUpdate;
 
                       // Only paint if we have recent data (within FADE_DURATION)
@@ -320,10 +330,11 @@ export default function BrainStressDemo() {
                         // Apply fade to intensity
                         const fadedIntensity = data.intensity * fadeFactor;
 
+                        console.log(`${electrodeName}: intensity=${data.intensity.toFixed(2)}, fade=${fadeFactor.toFixed(2)}, final=${fadedIntensity.toFixed(2)}`);
+
                         // Only paint if intensity is significant
                         if (fadedIntensity > 0.1) {
                           paintRegion(electrodeName as RegionMode, fadedIntensity);
-                          anyActive = true;
                         }
                       }
                     });
