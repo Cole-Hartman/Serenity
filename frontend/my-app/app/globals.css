@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+button[aria-label="Open Next.js developer tools"],
+button[aria-label="Route"],
+#nextjs-portal { 
+  display: none !important; 
+}
+
+button[aria-label="Open Next.js developer tools"],
+#nextjs-portal,
+[data-nextjs-dialog-overlay],
+[data-nextjs-dev-overlay] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
