@@ -43,7 +43,7 @@ export default function AutismSlideshow() {
 	}, [])
 
 	return (
-		<section className="relative py-20 px-4 overflow-hidden">
+		<section className="relative py-20 px-4 overflow-hidden bg-gradient-to-b from-indigo-600 via-purple-600 to-sky-500">
 			{/* Background gradient accent */}
 			<div className="absolute inset-0 bg-gradient-to-b from-transparent via-indigo-500/5 to-transparent pointer-events-none" />
 
@@ -56,7 +56,7 @@ export default function AutismSlideshow() {
 					transition={{ duration: 0.6 }}
 					className="text-center mb-12"
 				>
-					<h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500 bg-clip-text text-transparent mb-4">
+					<h2 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)] mb-4">
 						Understanding Through Empathy
 					</h2>
 					<p className="text-lg text-foreground/70 max-w-2xl mx-auto">
@@ -90,7 +90,7 @@ export default function AutismSlideshow() {
 
 							{/* Message container */}
 							<div className="text-center space-y-4 px-4">
-								<h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500 bg-clip-text text-transparent">
+								<h3 className="text-2xl md:text-3xl font-bold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)]">
 									{slides[currentSlide].title}
 								</h3>
 								<p className="text-lg text-foreground/80 max-w-3xl mx-auto leading-relaxed">
@@ -101,20 +101,26 @@ export default function AutismSlideshow() {
 					</AnimatePresence>
 
 					{/* Slide indicators */}
+
+
 					<div className="flex justify-center gap-2 mt-8">
 						{slides.map((_, index) => (
 							<button
 								key={index}
 								onClick={() => setCurrentSlide(index)}
-								className={`h-2 rounded-full transition-all duration-300 ${index === currentSlide
-										? "w-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500"
-										: "w-2 bg-foreground/20 hover:bg-foreground/40"
-									}`}
+								className={`h-2 rounded-full transition-all duration-300 ${
+									index === currentSlide
+										? "w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+										: "w-2 bg-white/40 hover:bg-white/70"
+								}`}
 								aria-label={`Go to slide ${index + 1}`}
 							/>
 						))}
 					</div>
 				</div>
+
+
+
 
 				{/* Call to action */}
 				<motion.div
@@ -124,9 +130,11 @@ export default function AutismSlideshow() {
 					transition={{ duration: 0.6, delay: 0.3 }}
 					className="text-center mt-12"
 				>
-					<p className="text-xl font-medium bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500 bg-clip-text text-transparent">
-						Together, we can create a more inclusive and understanding world.
+					
+					<p className="text-xl font-medium text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)]">
+  					Together, we can create a more inclusive and understanding world.
 					</p>
+
 				</motion.div>
 			</div>
 		</section>
