@@ -1,13 +1,39 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 declare global { interface Window { BrainBrowser: any } }
 
 type RegionMode = "global" | "AF7" | "AF8" | "TP9" | "TP10";
 
+interface ElectrodeData {
+  electrode_name: string;
+  alpha: number;
+  beta: number;
+  beta_alpha_ratio: number;
+  stress_intensity: number;
+  timestamp: string;
+}
+
+interface ElectrodeStress {
+  [key: string]: {
+    intensity: number;
+    lastUpdate: number;
+  };
+}
+
 export default function BrainStressDemo() {
   const ref = useRef<HTMLDivElement>(null);
+  const [electrodeStress, setElectrodeStress] = useState<ElectrodeStress>({
+    AF7: { intensity: 0, lastUpdate: 0 },
+    AF8: { intensity: 0, lastUpdate: 0 },
+    TP9: { intensity: 0, lastUpdate: 0 },
+    TP10: { intensity: 0, lastUpdate: 0 }
+  });
+
+  // Fade duration in milliseconds
+  const FADE_DURATION = 8000; // 8 seconds fade out
 
   useEffect(() => {
     function loadScript(url: string): Promise<void> {
@@ -272,50 +298,86 @@ export default function BrainStressDemo() {
                     console.log(`Highlighted ${highlightedCount} vertices in ${mode} region`);
                   }
 
-                  // Simulate Muse 2 electrode activity with mock data
-                  // In production, replace with real EEG data from your Supabase stream
-                  let t = 0;
-                  const timer = setInterval(() => {
-                    t += 0.25;
-
-                    // Simulate beta/alpha ratios for each electrode (0-1 scale)
-                    const af7Stress = 0.5 + 0.4 * Math.sin(t * 0.7);  // Left frontal stress
-                    const af8Stress = 0.5 + 0.3 * Math.cos(t * 0.5);  // Right frontal stress
-                    const tp9Stress = 0.5 + 0.35 * Math.sin(t * 0.4); // Left temporal
-                    const tp10Stress = 0.5 + 0.25 * Math.cos(t * 0.6); // Right temporal
+                  // Function to update brain visualization based on current electrode stress levels
+                  function updateBrainVisualization() {
+                    const now = Date.now();
 
                     // Reset to baseline first
                     resetToBaseline();
 
-                    // Track if any region is above threshold
+                    // Track if any region is active
                     let anyActive = false;
 
-                    // Paint ALL regions that exceed their stress thresholds
-                    if (af7Stress > 0.65) {
-                      paintRegion("AF7", af7Stress);
-                      anyActive = true;
-                    }
-                    if (af8Stress > 0.65) {
-                      paintRegion("AF8", af8Stress);
-                      anyActive = true;
-                    }
-                    if (tp9Stress > 0.6) {
-                      paintRegion("TP9", tp9Stress);
-                      anyActive = true;
-                    }
-                    if (tp10Stress > 0.6) {
-                      paintRegion("TP10", tp10Stress);
-                      anyActive = true;
-                    }
+                    // Paint each electrode region with fade-out based on time since last update
+                    Object.entries(electrodeStress).forEach(([electrodeName, data]) => {
+                      const timeSinceUpdate = now - data.lastUpdate;
+
+                      // Only paint if we have recent data (within FADE_DURATION)
+                      if (timeSinceUpdate < FADE_DURATION && data.intensity > 0) {
+                        // Calculate fade factor (1.0 = just updated, 0.0 = fully faded)
+                        const fadeFactor = 1 - (timeSinceUpdate / FADE_DURATION);
+
+                        // Apply fade to intensity
+                        const fadedIntensity = data.intensity * fadeFactor;
+
+                        // Only paint if intensity is significant
+                        if (fadedIntensity > 0.1) {
+                          paintRegion(electrodeName as RegionMode, fadedIntensity);
+                          anyActive = true;
+                        }
+                      }
+                    });
 
                     // Update colors once after painting all regions
-                    if (anyActive) {
-                      viewer.updateColors();
-                    }
-                  }, 800);
+                    viewer.updateColors();
+                  }
+
+                  // Set up animation loop for smooth fade-out
+                  const animationTimer = setInterval(() => {
+                    updateBrainVisualization();
+                  }, 100); // Update at 10fps for smooth fading
+
+                  // Subscribe to electrode_data updates from Supabase
+                  const channel = supabase
+                    .channel('electrode-updates')
+                    .on(
+                      'postgres_changes',
+                      {
+                        event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+                        schema: 'public',
+                        table: 'electrode_data'
+                      },
+                      (payload) => {
+                        console.log('Electrode data update:', payload);
+
+                        if (payload.new && typeof payload.new === 'object') {
+                          const data = payload.new as ElectrodeData;
+                          const electrodeName = data.electrode_name;
+
+                          // Update state with new electrode data
+                          setElectrodeStress(prev => ({
+                            ...prev,
+                            [electrodeName]: {
+                              intensity: data.stress_intensity,
+                              lastUpdate: Date.now()
+                            }
+                          }));
+
+                          console.log(`${electrodeName}: stress=${data.stress_intensity.toFixed(2)}, ratio=${data.beta_alpha_ratio.toFixed(2)}`);
+                        }
+                      }
+                    )
+                    .subscribe();
+
+                  console.log("Subscribed to electrode_data realtime updates");
 
                   viewer.addEventListener("destroy", () => {
-                    clearInterval(timer);
+                    // Clean up animation timer
+                    clearInterval(animationTimer);
+
+                    // Clean up Supabase subscription
+                    channel.unsubscribe();
+
                     if (rotationPauseTimeout) {
                       clearTimeout(rotationPauseTimeout);
                     }
