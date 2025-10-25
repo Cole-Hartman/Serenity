@@ -81,7 +81,6 @@ export default function EEGChart() {
 	// --- Time range computation ---
 	const now = Date.now()
 
-	// convert visibleRange to milliseconds depending on the unit
 	const rangeMs = (() => {
 		switch (rangeUnit) {
 			case 'seconds':
@@ -98,7 +97,19 @@ export default function EEGChart() {
 	})()
 
 	const minTime = now - rangeMs
-	const filtered = data.filter((d) => d.timestamp >= minTime)
+	let filtered = data.filter((d) => d.timestamp >= minTime)
+
+	// --- If no EEG data, show a flat baseline ---
+	const noData = filtered.length === 0
+	if (noData) {
+		const now = Date.now()
+		filtered = Array.from({ length: 50 }, (_, i) => ({
+			timestamp: now - (50 - i) * 1000,
+			alpha: 0,
+			beta: 0,
+			beta_alpha_ratio: 0,
+		}))
+	}
 
 	// --- Helper for label ---
 	function formatRangeLabel() {
@@ -115,7 +126,7 @@ export default function EEGChart() {
 	}
 
 	return (
-		<div className="w-full h-full flex flex-col bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+		<div className="w-full h-full flex flex-col bg-neutral-950 rounded-xl border border-neutral-800 p-3 relative">
 			{/* Header */}
 			<div className="flex justify-between items-center mb-2">
 				<h2 className="text-sm text-gray-300">EEG Activity (α / β / Ratio)</h2>
@@ -123,8 +134,8 @@ export default function EEGChart() {
 					<button
 						onClick={() => setMode('live')}
 						className={`px-2 py-1 text-xs rounded-md ${mode === 'live'
-								? 'bg-purple-600 text-white'
-								: 'bg-neutral-800 text-gray-400'
+							? 'bg-purple-600 text-white'
+							: 'bg-neutral-800 text-gray-400'
 							}`}
 					>
 						Live
@@ -132,8 +143,8 @@ export default function EEGChart() {
 					<button
 						onClick={() => setMode('past')}
 						className={`px-2 py-1 text-xs rounded-md ${mode === 'past'
-								? 'bg-purple-600 text-white'
-								: 'bg-neutral-800 text-gray-400'
+							? 'bg-purple-600 text-white'
+							: 'bg-neutral-800 text-gray-400'
 							}`}
 					>
 						Past
@@ -142,7 +153,13 @@ export default function EEGChart() {
 			</div>
 
 			{/* Chart */}
-			<div className="flex-1 flex items-center justify-center overflow-hidden">
+			<div className="flex-1 flex items-center justify-center overflow-hidden relative">
+				{noData && (
+					<p className="absolute text-xs text-gray-500 top-2 right-4 italic z-10">
+						No live data — displaying flat baseline
+					</p>
+				)}
+
 				<LineChart
 					data={filtered}
 					style={{
@@ -191,7 +208,7 @@ export default function EEGChart() {
 						yAxisId="left"
 						type="monotone"
 						dataKey="alpha"
-						stroke="#7b61ff"
+						stroke={noData ? '#7b61ff33' : '#7b61ff'}
 						dot={false}
 						strokeWidth={2}
 						name="Alpha"
@@ -200,7 +217,7 @@ export default function EEGChart() {
 						yAxisId="left"
 						type="monotone"
 						dataKey="beta"
-						stroke="#00ffa3"
+						stroke={noData ? '#00ffa333' : '#00ffa3'}
 						dot={false}
 						strokeWidth={2}
 						name="Beta"
@@ -209,7 +226,7 @@ export default function EEGChart() {
 						yAxisId="left"
 						type="monotone"
 						dataKey="beta_alpha_ratio"
-						stroke="#ff7300"
+						stroke={noData ? '#ff730033' : '#ff7300'}
 						dot={false}
 						strokeWidth={2}
 						name="β/α Ratio"
@@ -219,9 +236,7 @@ export default function EEGChart() {
 
 			{/* Range Controls */}
 			<div className="flex flex-col items-center mt-2 text-gray-300">
-				<label className="mb-1 text-xs">
-					Visible Range: {formatRangeLabel()}
-				</label>
+				<label className="mb-1 text-xs">Visible Range: {formatRangeLabel()}</label>
 
 				<input
 					type="range"
@@ -248,8 +263,8 @@ export default function EEGChart() {
 							key={u}
 							onClick={() => setRangeUnit(u)}
 							className={`px-2 py-1 rounded-md ${rangeUnit === u
-									? 'bg-purple-600 text-white'
-									: 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
+								? 'bg-purple-600 text-white'
+								: 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
 								}`}
 						>
 							{u[0].toUpperCase() + u.slice(1)}
