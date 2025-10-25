@@ -75,12 +75,12 @@ export default function EEGMoodRadar() {
 
 	return (
 		<div className="w-full bg-neutral-950 rounded-xl p-4 shadow-md border border-neutral-800 flex flex-col items-center">
-			<h2 className="text-lg text-gray-200 mb-4">
+			<h2 className="text-lg text-gray-200">
 				Mood Distribution Radar (Past {visibleDays} Day{visibleDays > 1 ? 's' : ''})
 			</h2>
 
-			<ResponsiveContainer width="100%" height={400}>
-				<RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
+			<ResponsiveContainer width="110%" height={390}>
+				<RadarChart cx="50%" cy="50%" outerRadius="75%" data={data}>
 					<PolarGrid stroke="#333" />
 					<PolarAngleAxis dataKey="mood" tick={{ fill: '#aaa', fontSize: 12 }} />
 					<PolarRadiusAxis angle={30} domain={[0, 250]} tick={{ fill: '#666' }} />
@@ -101,25 +101,6 @@ export default function EEGMoodRadar() {
 					/>
 				</RadarChart>
 			</ResponsiveContainer>
-
-			{/* Slider control */}
-			<div className="flex flex-col items-center mt-6 text-gray-300">
-				<label className="mb-2 text-sm">
-					Visible Data Window: {visibleDays} day{visibleDays > 1 ? 's' : ''}
-				</label>
-				<input
-					type="range"
-					min="1"
-					max="30"
-					step="1"
-					value={visibleDays}
-					onChange={(e) => setVisibleDays(Number(e.target.value))}
-					className="w-2/3 accent-purple-500"
-				/>
-				<p className="text-xs text-gray-500 mt-2">
-					Adjusts how many past days of EEG data are analyzed for mood distribution.
-				</p>
-			</div>
 		</div>
 	)
 }

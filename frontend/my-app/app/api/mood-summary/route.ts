@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
+import { serenityPrompt } from '@/src/prompts/serenityPrompt'
 
 export async function POST(req: Request) {
 	const { range } = await req.json()
@@ -30,7 +31,6 @@ export async function POST(req: Request) {
 		return NextResponse.json({ text: `No EEG data available for the past ${range}.` })
 	}
 
-	// Compute averages
 	const avg = (key: 'alpha' | 'beta' | 'beta_alpha_ratio') =>
 		rows.reduce((sum, r) => sum + (r[key] ?? 0), 0) / rows.length
 
@@ -43,19 +43,7 @@ export async function POST(req: Request) {
 		return NextResponse.json({ text: 'Server missing Anthropic API key.' })
 	}
 
-	const prompt = `
-You are a neuroscience mood coach.
-
-EEG summary for the past ${range}:
-- Avg Alpha: ${alpha.toFixed(3)}
-- Avg Beta: ${beta.toFixed(3)}
-- Avg Beta/Alpha Ratio: ${ratio.toFixed(3)}
-
-1. Briefly describe the most likely mood or cognitive state represented by these readings.
-2. Give 2 concise, practical recommendations to help regulate or optimize the user's state (e.g., breathing, focus, rest, hydration).
-
-Respond in Markdown under 150 words.
-`
+	const prompt = serenityPrompt(range, alpha, beta, ratio)
 
 	async function callClaude(model: string) {
 		const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -67,10 +55,11 @@ Respond in Markdown under 150 words.
 			},
 			body: JSON.stringify({
 				model,
-				max_tokens: 250,
+				max_tokens: 300,
 				messages: [{ role: 'user', content: prompt }],
 			}),
 		})
+
 		if (!res.ok) throw new Error(`Claude API error ${res.status}`)
 		const data = await res.json()
 		return data?.content?.[0]?.text ?? 'No response text.'

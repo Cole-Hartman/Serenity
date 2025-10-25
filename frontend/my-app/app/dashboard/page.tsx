@@ -8,9 +8,9 @@ import MoodSummaryBox from '../components/MoodSummaryBox'
 
 export default function DashboardPage() {
 	return (
-		<main className="min-h-screen bg-black text-white flex flex-col items-center p-4 overflow-hidden">
+		<main className="h-screen w-screen bg-black text-white flex flex-col items-center overflow-hidden">
 			{/* Header */}
-			<header className="w-full max-w-7xl mb-3">
+			<header className="w-full max-w-7xl px-4 pt-4 pb-2">
 				<h1 className="text-3xl font-semibold tracking-tight mb-1">
 					Serenity EEG Dashboard
 				</h1>
@@ -22,10 +22,11 @@ export default function DashboardPage() {
 			{/* Dashboard Grid */}
 			<div
 				className="
-					w-full max-w-7xl
+					w-full max-w-7xl flex-1
 					grid grid-cols-3 gap-4
-					grid-rows-[minmax(0,55vh)_minmax(0,35vh)]
-					h-[90vh]
+					grid-rows-[minmax(0,55%)_minmax(0,35%)]
+					px-4 pb-2
+					overflow-hidden
 				"
 			>
 				{/* Row 1 */}
@@ -49,7 +50,7 @@ export default function DashboardPage() {
 			</div>
 
 			{/* Footer */}
-			<footer className="text-gray-500 text-xs mt-2 text-center opacity-70">
+			<footer className="text-gray-500 text-xs text-center opacity-70 mb-1">
 				Data streamed from Supabase • Charts powered by Recharts • Built with Next.js 16
 			</footer>
 		</main>
