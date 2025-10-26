@@ -16,6 +16,7 @@
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
     "brainbrowser": "^2.3.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^12.23.24",
     "howler": "^2.2.4",
     "lucide-react": "^0.548.0",
@@ -26,6 +27,7 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.3.0",
     "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.3.1",
     "tsparticles": "^3.9.1"
   },
   "devDependencies": {
