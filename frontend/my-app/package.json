@@ -11,6 +11,9 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.76.1",
     "@tailwindcss/typography": "^0.5.19",
+    "@tsparticles/engine": "^3.9.1",
+    "@tsparticles/react": "^3.0.0",
+    "@tsparticles/slim": "^3.9.1",
     "brainbrowser": "^2.3.0",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.548.0",
