@@ -13,6 +13,24 @@ import {
 import { supabase } from '@/lib/supabaseClient'
 
 /**
+ * ============================================================================
+ * STRESS DETECTION TUNING GUIDE
+ * ============================================================================
+ *
+ * This component uses PRE-CALCULATED stress intensity from the backend to
+ * ensure perfect alignment with the brain model's electrode colors.
+ *
+ * Backend (brainscan.py) calculates composite stress using:
+ *   - 40% β/θ ratio (normalized 0.5-3.0 range)
+ *   - 30% β power (normalized 0.05-0.35 range)
+ *   - 20% β/α ratio (normalized 0.5-3.0 range)
+ *   - Smoothing: 5-sample window for aggregate data
+ *
+ * Frontend (this file) applies:
+ *   - 15-second rolling window averaging of pre-calculated stress
+ *   - Threshold mapping to visual levels (Green/Yellow/Red)
+ *   - Debouncing for level downgrades
+ *
  * AVERAGING_WINDOW_MS:
  *   - Lower (10s): More responsive but noisier
  *   - Higher (30s): Smoother but slower to react
@@ -23,21 +41,13 @@ import { supabase } from '@/lib/supabaseClient'
  *   - Higher = more stable but slower to show improvement
  *   - Recommended: 5-15 seconds
  *
- * Normalization Ranges (match backend brainscan_unified.py):
- *   - BETA_POWER_MIN/MAX: Typical β power range (0.05-0.35)
- *   - RATIO_MIN/MAX: Typical β/α and β/θ ratio range (0.5-3.0)
- *   - Adjust if your baseline measurements differ significantly
+ * STRESS_LOW_THRESHOLD (0.4):
+ *   - Green → Yellow boundary
+ *   - Matches electrode color coding in brainModel.tsx
  *
- * Stress Level Thresholds (match brain model):
- *   - STRESS_LOW_THRESHOLD: 0.4 (Green → Yellow boundary)
- *   - STRESS_HIGH_THRESHOLD: 0.7 (Yellow → Red boundary)
- *   - These match the electrode color coding in brainModel.tsx
- *
- * Composite Weights (match backend):
- *   - β/θ ratio: 40% (primary stress indicator)
- *   - β power: 30% (cognitive load)
- *   - β/α ratio: 20% (traditional stress metric)
- *
+ * STRESS_HIGH_THRESHOLD (0.7):
+ *   - Yellow → Red boundary
+ *   - Matches electrode color coding in brainModel.tsx
  * ============================================================================
  */
 
@@ -45,19 +55,9 @@ const STRESS_CONFIG = {
   // Averaging window for stress calculation (milliseconds)
   AVERAGING_WINDOW_MS: 15_000,  // 15 seconds
 
-  // Normalization ranges for composite stress calculation (match backend)
-  BETA_POWER_MIN: 0.05,         // Typical minimum β power
-  BETA_POWER_MAX: 0.35,         // Typical maximum β power
-  RATIO_MIN: 0.5,               // Typical minimum ratio (β/α or β/θ)
-  RATIO_MAX: 3.0,               // Typical maximum ratio (β/α or β/θ)
-
   // Stress level thresholds (0-1 scale, matches brain model)
   STRESS_LOW_THRESHOLD: 0.4,    // Below = Green (Relaxed)
   STRESS_HIGH_THRESHOLD: 0.7,   // Above = Red (Stressed), between = Yellow (Alert)
-
-  WEIGHT_BETA_THETA: 0.40,      // β/θ ratio weight (primary indicator)
-  WEIGHT_BETA_POWER: 0.30,      // β power weight (cognitive load)
-  WEIGHT_BETA_ALPHA: 0.20,      // β/α ratio weight (traditional metric)
 
   // Debouncing time for level downgrade (milliseconds)
   DEBOUNCE_DOWN_MS: 5000,       // 5 seconds
@@ -70,6 +70,7 @@ interface EEGSample {
   theta: number
   beta_alpha_ratio: number
   beta_theta_ratio: number
+  stress_intensity?: number  // Pre-calculated composite stress from backend (0-1 scale)
 }
 
 type MetricMode = 'alpha-beta' | 'theta-beta'
@@ -87,60 +88,13 @@ interface EEGChartProps {
 }
 
 /**
- * Normalize a value to 0-1 range
- * Clamps values outside the min-max range
- */
-function normalize(value: number, min: number, max: number): number {
-  if (value < min) return 0
-  if (value > max) return 1
-  return (value - min) / (max - min)
-}
-
-/**
- * Calculate composite stress intensity using the same formula as the brain model
- *
- * This matches the backend's multi-metric stress detection:
- * - Normalizes β power, β/θ ratio, and β/α ratio to 0-1 scale
- * - Combines them with weighted average: 30% β power + 40% β/θ + 20% β/α
- * - Returns 0-1 stress intensity (matches electrode stress_intensity)
- */
-function calculateCompositeStress(beta: number, betaAlphaRatio: number, betaThetaRatio: number): number {
-  // Normalize β power to 0-1 range (typical beta is 0.05-0.35)
-  const normalizedBeta = normalize(
-    beta,
-    STRESS_CONFIG.BETA_POWER_MIN,
-    STRESS_CONFIG.BETA_POWER_MAX
-  )
-
-  // Normalize β/θ ratio to 0-1 (typical range 0.5-3.0)
-  const normalizedBetaTheta = normalize(
-    betaThetaRatio,
-    STRESS_CONFIG.RATIO_MIN,
-    STRESS_CONFIG.RATIO_MAX
-  )
-
-  // Normalize β/α ratio to 0-1 (typical range 0.5-3.0)
-  const normalizedBetaAlpha = normalize(
-    betaAlphaRatio,
-    STRESS_CONFIG.RATIO_MIN,
-    STRESS_CONFIG.RATIO_MAX
-  )
-
-  // Weighted composite stress score (matches backend)
-  // Weights: β/θ (40%), β power (30%), β/α (20%)
-  const compositeStress = (
-    STRESS_CONFIG.WEIGHT_BETA_THETA * normalizedBetaTheta +
-    STRESS_CONFIG.WEIGHT_BETA_POWER * normalizedBeta +
-    STRESS_CONFIG.WEIGHT_BETA_ALPHA * normalizedBetaAlpha
-  )
-
-  // Clamp to 0-1 range
-  return Math.min(Math.max(compositeStress, 0), 1)
-}
-
-/**
  * Convert composite stress intensity (0-1) to stress level
  * Matches brain model thresholds: <0.4 = Green, 0.4-0.7 = Yellow, >0.7 = Red
+ *
+ * Note: Stress is now calculated in the backend (brainscan.py) using composite formula:
+ * - 40% β/θ ratio (normalized 0.5-3.0)
+ * - 30% β power (normalized 0.05-0.35)
+ * - 20% β/α ratio (normalized 0.5-3.0)
  */
 function getStressLevel(stressIntensity: number): StressLevel {
   if (stressIntensity >= STRESS_CONFIG.STRESS_HIGH_THRESHOLD) return 'high'
@@ -179,6 +133,7 @@ export default function EEGChart({
           theta: r.theta ?? 0,
           beta_alpha_ratio: r.beta_alpha_ratio ?? 0,
           beta_theta_ratio: r.beta_theta_ratio ?? 0,
+          stress_intensity: r.stress_intensity ?? 0,
         }))
         setData(formatted)
       }
@@ -203,6 +158,7 @@ export default function EEGChart({
               theta: record.theta ?? 0,
               beta_alpha_ratio: record.beta_alpha_ratio ?? 0,
               beta_theta_ratio: record.beta_theta_ratio ?? 0,
+              stress_intensity: record.stress_intensity ?? 0,
             },
           ])
         }
@@ -247,32 +203,31 @@ export default function EEGChart({
     }))
   }
 
-  // --- Compute short-window averages & current stress level using composite calculation ---
-  const { baAvg, btAvg, betaAvg, stressIntensity, currentLevel } = useMemo(() => {
+  // --- Compute short-window averages & current stress level from pre-calculated backend stress ---
+  const { baAvg, btAvg, stressIntensity, currentLevel } = useMemo(() => {
     const cutoff = Date.now() - STRESS_CONFIG.AVERAGING_WINDOW_MS  // Fresh timestamp
     const windowed = data.filter((d) => d.timestamp >= cutoff)
 
     if (!windowed.length) {
-      return { baAvg: 0, btAvg: 0, betaAvg: 0, stressIntensity: 0, currentLevel: 'low' as StressLevel }
+      return { baAvg: 0, btAvg: 0, stressIntensity: 0, currentLevel: 'low' as StressLevel }
     }
 
-    // Calculate averages for all metrics needed for composite stress
+    // Calculate averages for display purposes
     const sumBA = windowed.reduce((acc, d) => acc + (d.beta_alpha_ratio ?? 0), 0)
     const sumBT = windowed.reduce((acc, d) => acc + (d.beta_theta_ratio ?? 0), 0)
-    const sumBeta = windowed.reduce((acc, d) => acc + (d.beta ?? 0), 0)
+    const sumStress = windowed.reduce((acc, d) => acc + (d.stress_intensity ?? 0), 0)
 
     const baAvg = sumBA / windowed.length
     const btAvg = sumBT / windowed.length
-    const betaAvg = sumBeta / windowed.length
 
-    // Calculate composite stress intensity (0-1 scale, matches brain model)
-    const intensity = calculateCompositeStress(betaAvg, baAvg, btAvg)
+    // Use pre-calculated stress intensity from backend (already composite calculated)
+    const intensity = sumStress / windowed.length
 
     // Convert intensity to stress level (matches brain model thresholds)
     const level = getStressLevel(intensity)
 
-    return { baAvg, btAvg, betaAvg, stressIntensity: intensity, currentLevel: level }
-  }, [data])  // Removed 'now' from dependencies - this fixes the bug!
+    return { baAvg, btAvg, stressIntensity: intensity, currentLevel: level }
+  }, [data])
 
   // --- Debouncing logic for stress level changes ---
   const [displayLevel, setDisplayLevel] = useState<StressLevel>('low')

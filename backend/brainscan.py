@@ -236,18 +236,49 @@ try:
                     aggregate_history.pop(0)
                 smoothed_aggregate = np.mean(aggregate_history)
 
+                # Calculate aggregate composite stress intensity (matches per-electrode calculation)
+                # Normalize beta power to 0-1 range (typical beta is 0.05-0.35)
+                normalized_beta = min(max((aggregate_beta - 0.05) / 0.30, 0), 1)
+
+                # Normalize beta/theta ratio to 0-1 (typical range 0.5-3.0)
+                normalized_beta_theta = min(max((aggregate_beta_theta_ratio - 0.5) / 2.5, 0), 1)
+
+                # Normalize beta/alpha ratio to 0-1 (typical range 0.5-3.0)
+                normalized_beta_alpha = min(max((smoothed_aggregate - 0.5) / 2.5, 0), 1)
+
+                # Weighted composite stress score (matches per-electrode weights)
+                # Weights: beta/theta (40%), beta power (30%), beta/alpha (20%)
+                aggregate_stress_intensity = (
+                    0.40 * normalized_beta_theta +
+                    0.30 * normalized_beta +
+                    0.20 * normalized_beta_alpha
+                )
+
+                # Clamp to 0-1 range
+                aggregate_stress_intensity = min(max(aggregate_stress_intensity, 0), 1)
+
+                # Determine stress level emoji for aggregate (matches electrode thresholds)
+                if aggregate_stress_intensity > 0.7:
+                    stress_emoji = "🔴"
+                elif aggregate_stress_intensity > 0.4:
+                    stress_emoji = "🟡"
+                else:
+                    stress_emoji = "🟢"
+
                 aggregate_payload = {
                     "alpha": float(aggregate_alpha),
                     "beta": float(aggregate_beta),
                     "theta": float(aggregate_theta),
                     "beta_alpha_ratio": float(smoothed_aggregate),
-                    "beta_theta_ratio": float(aggregate_beta_theta_ratio)
+                    "beta_theta_ratio": float(aggregate_beta_theta_ratio),
+                    "stress_intensity": float(aggregate_stress_intensity)
                 }
 
                 supabase.table("brain_data").insert(aggregate_payload).execute()
-                print(f"\n  📈 Aggregate ({len(valid_channels)} channels): α={aggregate_alpha:5.2f}, "
+                print(f"\n  {stress_emoji} Aggregate ({len(valid_channels)} channels): α={aggregate_alpha:5.2f}, "
                       f"β={aggregate_beta:5.2f}, θ={aggregate_theta:5.2f}, "
-                      f"β/α={smoothed_aggregate:4.2f}, β/θ={aggregate_beta_theta_ratio:4.2f}")
+                      f"β/α={smoothed_aggregate:4.2f}, β/θ={aggregate_beta_theta_ratio:4.2f}, "
+                      f"stress={aggregate_stress_intensity:4.2f}")
 
             except Exception as e:
                 print(f"  ❌ Error inserting aggregate data: {e}")

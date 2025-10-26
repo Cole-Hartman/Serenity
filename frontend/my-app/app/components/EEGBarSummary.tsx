@@ -112,7 +112,6 @@ export default function EEGBarSummary() {
 					{ name: 'β/α Ratio', value: avg('beta_alpha_ratio') },
 					{ name: 'β/θ Ratio', value: avg('beta_theta_ratio') },
 				])
-				console.log('Data updated:', data)
 			} catch (err) {
 				console.error('Error fetching EEG data:', err)
 				setError('Failed to load EEG data')
