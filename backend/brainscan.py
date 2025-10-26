@@ -1,3 +1,7 @@
+"""
+Unified EEG Scanner for Muse 2
+Streams data to both per-electrode (electrode_data) and aggregated (brain_data) tables
+"""
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow.data_filter import DataFilter, FilterTypes, DetrendOperations
 from supabase import create_client
@@ -5,6 +9,7 @@ from dotenv import load_dotenv
 import os, time
 import numpy as np
 
+# --- Load .env ---
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -103,31 +108,65 @@ try:
             bands = DataFilter.get_avg_band_powers(data, [ch], sr, True)
             feature_vector = bands[0]  # [delta, theta, alpha, beta, gamma]
 
+            delta = feature_vector[0]
+            theta = feature_vector[1]
             alpha = feature_vector[2]
             beta = feature_vector[3]
+            gamma = feature_vector[4]
 
-            # Skip if alpha is too low (likely complete signal loss or disconnection)
-            if alpha < 0.1:
-                print(f"⚠️  {electrode_name}: Alpha power too low ({alpha:.4f}), skipping...")
+            print(f"  Debug {electrode_name}: delta={delta:.4f}, theta={theta:.4f}, alpha={alpha:.4f}, beta={beta:.4f}, gamma={gamma:.4f}")
+
+            # Skip if delta > 0.5 (user is drowsy/sleeping, not stressed)
+            if delta > 0.5:
+                print(f"⚠️  {electrode_name}: High delta detected ({delta:.4f}), user appears drowsy/sleeping, skipping...")
                 continue
 
-            # Calculate BETA/ALPHA ratio
-            ratio = beta / alpha
+            # Skip if alpha is too low (likely complete signal loss or disconnection)
+            # Lowered threshold to 0.03 to accept eyes-open states (alpha naturally low)
+            if alpha < 0.03:
+                print(f"⚠️  {electrode_name}: Alpha power too low ({alpha:.4f}), likely poor contact, skipping...")
+                continue
 
-            # Apply smoothing per electrode
-            electrode_history[electrode_name].append(ratio)
+            # Calculate traditional BETA/ALPHA ratio
+            beta_alpha_ratio = beta / alpha if alpha > 0 else 0
+
+            # Calculate BETA/THETA ratio as additional stress indicator
+            beta_theta_ratio = beta / theta if theta > 0 else 0
+
+            # Multi-metric stress detection (weighted composite score)
+            # Normalize beta power to 0-1 range (typical beta is 0.05-0.35)
+            normalized_beta = min(max((beta - 0.05) / 0.30, 0), 1)
+
+            # Normalize beta/theta ratio to 0-1 (typical range 0.5-3.0)
+            normalized_beta_theta = min(max((beta_theta_ratio - 0.5) / 2.5, 0), 1)
+
+            # Normalize beta/alpha ratio to 0-1 (typical range 0.5-3.0)
+            normalized_beta_alpha = min(max((beta_alpha_ratio - 0.5) / 2.5, 0), 1)
+
+            # Weighted composite stress score
+            # Weights: beta/theta (40%), beta power (30%), beta/alpha (20%), asymmetry (10% - calculated later)
+            composite_stress = (
+                0.40 * normalized_beta_theta +
+                0.30 * normalized_beta +
+                0.20 * normalized_beta_alpha
+            )
+
+            # Apply smoothing to composite stress
+            electrode_history[electrode_name].append(composite_stress)
             if len(electrode_history[electrode_name]) > SMOOTHING_WINDOW:
                 electrode_history[electrode_name].pop(0)
-            smoothed_ratio = np.mean(electrode_history[electrode_name])
+            smoothed_stress = np.mean(electrode_history[electrode_name])
 
-            # Calculate stress intensity (0-1 scale)
-            stress_intensity = normalize_stress(smoothed_ratio)
+            # Clamp to 0-1 range
+            stress_intensity = min(max(smoothed_stress, 0), 1)
 
             # Store processed data for this electrode
             electrode_data[electrode_name] = {
                 'alpha': float(alpha),
                 'beta': float(beta),
-                'beta_alpha_ratio': float(smoothed_ratio),
+                'theta': float(theta),
+                'beta_alpha_ratio': float(beta_alpha_ratio),
+                'beta_theta_ratio': float(beta_theta_ratio),
                 'stress_intensity': float(stress_intensity)
             }
 
@@ -177,33 +216,44 @@ try:
                 print(f"  ❌ Error upserting {electrode_name}: {e}")
 
         # ===== 2. Write aggregated data (for historical tracking) =====
-        try:
-            # Calculate aggregate band powers from all valid channels
-            aggregate_bands = DataFilter.get_avg_band_powers(data, valid_channels, sr, True)
-            aggregate_features = aggregate_bands[0]
+        # Only compute aggregate if we have 2+ electrodes for meaningful statistics
+        if len(valid_channels) >= 2:
+            try:
+                # Calculate aggregate band powers from all valid channels
+                aggregate_bands = DataFilter.get_avg_band_powers(data, valid_channels, sr, True)
+                aggregate_features = aggregate_bands[0]
 
-            aggregate_alpha = aggregate_features[2]
-            aggregate_beta = aggregate_features[3]
-            aggregate_ratio = aggregate_beta / aggregate_alpha if aggregate_alpha > 0 else 0
+                aggregate_theta = aggregate_features[1]
+                aggregate_alpha = aggregate_features[2]
+                aggregate_beta = aggregate_features[3]
 
-            # Apply smoothing to aggregate
-            aggregate_history.append(aggregate_ratio)
-            if len(aggregate_history) > AGGREGATE_SMOOTHING:
-                aggregate_history.pop(0)
-            smoothed_aggregate = np.mean(aggregate_history)
+                # Calculate ratios
+                aggregate_beta_alpha_ratio = aggregate_beta / aggregate_alpha if aggregate_alpha > 0 else 0
+                aggregate_beta_theta_ratio = aggregate_beta / aggregate_theta if aggregate_theta > 0 else 0
 
-            aggregate_payload = {
-                "alpha": float(aggregate_alpha),
-                "beta": float(aggregate_beta),
-                "beta_alpha_ratio": float(smoothed_aggregate)
-            }
+                # Apply smoothing to beta/alpha ratio
+                aggregate_history.append(aggregate_beta_alpha_ratio)
+                if len(aggregate_history) > AGGREGATE_SMOOTHING:
+                    aggregate_history.pop(0)
+                smoothed_aggregate = np.mean(aggregate_history)
 
-            supabase.table("brain_data").insert(aggregate_payload).execute()
-            print(f"\n  📈 Aggregate: α={aggregate_alpha:5.2f}, β={aggregate_beta:5.2f}, "
-                  f"ratio={smoothed_aggregate:4.2f}")
+                aggregate_payload = {
+                    "alpha": float(aggregate_alpha),
+                    "beta": float(aggregate_beta),
+                    "theta": float(aggregate_theta),
+                    "beta_alpha_ratio": float(smoothed_aggregate),
+                    "beta_theta_ratio": float(aggregate_beta_theta_ratio)
+                }
 
-        except Exception as e:
-            print(f"  ❌ Error inserting aggregate data: {e}")
+                supabase.table("brain_data").insert(aggregate_payload).execute()
+                print(f"\n  📈 Aggregate ({len(valid_channels)} channels): α={aggregate_alpha:5.2f}, "
+                      f"β={aggregate_beta:5.2f}, θ={aggregate_theta:5.2f}, "
+                      f"β/α={smoothed_aggregate:4.2f}, β/θ={aggregate_beta_theta_ratio:4.2f}")
+
+            except Exception as e:
+                print(f"  ❌ Error inserting aggregate data: {e}")
+        else:
+            print(f"\n  ⚠️  Skipping aggregate (only {len(valid_channels)} channel, need 2+)")
 
         print("-" * 70)
         time.sleep(1)  # Sample every 1 second for responsive updates
@@ -215,3 +265,4 @@ except KeyboardInterrupt:
 finally:
     board.stop_stream()
     board.release_session()
+    print("✅ Session ended. Thank you!")

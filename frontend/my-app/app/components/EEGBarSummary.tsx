@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import {
 	BarChart,
 	Bar,
+	Cell,
 	XAxis,
 	YAxis,
 	CartesianGrid,
@@ -16,7 +17,9 @@ import { supabase } from '@/lib/supabaseClient'
 interface EEGSample {
 	alpha: number
 	beta: number
+	theta: number
 	beta_alpha_ratio: number
+	beta_theta_ratio: number
 	created_at: string
 }
 
@@ -24,67 +27,98 @@ export default function EEGBarSummary() {
 	const [data, setData] = useState<{ name: string; value: number }[]>([])
 	const [mode, setMode] = useState<'live' | 'past'>('live')
 	const [timeWindow, setTimeWindow] = useState('1h')
+	const [noData, setNoData] = useState(false)
+	const [error, setError] = useState<string | null>(null)
 
 	useEffect(() => {
 		let channel: any
 
 		const fetchData = async () => {
-			const now = new Date()
-			let start = new Date(now)
-			switch (timeWindow) {
-				case '10m':
-					start.setMinutes(now.getMinutes() - 10)
-					break
-				case '30m':
-					start.setMinutes(now.getMinutes() - 30)
-					break
-				case '1h':
-					start.setHours(now.getHours() - 1)
-					break
-				case '6h':
-					start.setHours(now.getHours() - 6)
-					break
-				case '12h':
-					start.setHours(now.getHours() - 12)
-					break
-				case '24h':
-					start.setDate(now.getDate() - 1)
-					break
-				case '3d':
-					start.setDate(now.getDate() - 3)
-					break
-				case '7d':
-					start.setDate(now.getDate() - 7)
-					break
+			try {
+				setError(null)
+
+				const now = new Date()
+				let start = new Date(now)
+				switch (timeWindow) {
+					case '10m':
+						start.setMinutes(now.getMinutes() - 10)
+						break
+					case '30m':
+						start.setMinutes(now.getMinutes() - 30)
+						break
+					case '1h':
+						start.setHours(now.getHours() - 1)
+						break
+					case '6h':
+						start.setHours(now.getHours() - 6)
+						break
+					case '12h':
+						start.setHours(now.getHours() - 12)
+						break
+					case '24h':
+						start.setDate(now.getDate() - 1)
+						break
+					case '3d':
+						start.setDate(now.getDate() - 3)
+						break
+					case '7d':
+						start.setDate(now.getDate() - 7)
+						break
+				}
+
+				let query = supabase
+					.from('brain_data')
+					.select('alpha,beta,theta,beta_alpha_ratio,beta_theta_ratio,created_at')
+					.order('created_at', { ascending: true })
+
+				if (mode === 'past') {
+					query = query.gte('created_at', start.toISOString())
+				} else {
+					query = query.limit(500).order('id', { ascending: false })
+				}
+
+				const { data: rows, error: queryError } = await query
+
+				if (queryError) {
+					console.error('Supabase error:', queryError)
+					setError(`Database error: ${queryError.message}`)
+					setNoData(true)
+					return
+				}
+
+				if (!rows || rows.length === 0) {
+					setNoData(true)
+					// Set placeholder data with all zeros for visual consistency
+					setData([
+						{ name: 'Alpha (α)', value: 0 },
+						{ name: 'Theta (θ)', value: 0 },
+						{ name: 'Beta (β)', value: 0 },
+						{ name: 'β/α Ratio', value: 0 },
+						{ name: 'β/θ Ratio', value: 0 },
+					])
+					return
+				}
+
+				// Valid data found
+				setNoData(false)
+
+				// compute averages
+				const avg = (key: keyof EEGSample) =>
+					rows.reduce((sum, r) => sum + (r[key] ?? 0), 0) / rows.length
+
+				setData([
+					{ name: 'Alpha (α)', value: avg('alpha') },
+					{ name: 'Theta (θ)', value: avg('theta') },
+					{ name: 'Beta (β)', value: avg('beta') },
+					{ name: 'β/α Ratio', value: avg('beta_alpha_ratio') },
+					{ name: 'β/θ Ratio', value: avg('beta_theta_ratio') },
+				])
+				console.log('Data updated:', data)
+			} catch (err) {
+				console.error('Error fetching EEG data:', err)
+				setError('Failed to load EEG data')
+				setNoData(true)
 			}
-
-			let query = supabase
-				.from('brain_data')
-				.select('alpha,beta,beta_alpha_ratio,created_at')
-				.order('created_at', { ascending: true })
-
-			if (mode === 'past') {
-				query = query.gte('created_at', start.toISOString())
-			} else {
-				query = query.limit(500).order('id', { ascending: false })
-			}
-
-			const { data: rows, error } = await query
-			if (error) {
-				console.error('Supabase error:', error)
-				return
-			}
-			if (!rows?.length) return
-
-			// compute averages
-			const avg = (key: keyof EEGSample) =>
-				rows.reduce((sum, r) => sum + (r[key] ?? 0), 0) / rows.length
-
-			setData([
-				{ name: 'Alpha', value: avg('alpha') },
-				{ name: 'Beta', value: avg('beta') },
-				{ name: 'β/α Ratio', value: avg('beta_alpha_ratio') },
-			])
 		}
 
 		fetchData()
@@ -151,19 +185,59 @@ export default function EEGBarSummary() {
 				</div>
 			</div>
 
-			<ResponsiveContainer width="100%" height={300}>
-				<BarChart data={data} margin={{ top: 8, right: 16, bottom: 24, left: 16 }}>
-					<CartesianGrid strokeDasharray="3 3" stroke="#333" />
-					<XAxis dataKey="name" stroke="#666" />
-					<YAxis stroke="#666" tickFormatter={(v) => v.toFixed(2)} />
-					<Tooltip
-						contentStyle={{ backgroundColor: '#111', border: 'none' }}
-						formatter={(value: number) => value.toFixed(3)}
-					/>
-					<Legend />
-					<Bar dataKey="value" fill="#7b61ff" barSize={60} radius={[8, 8, 0, 0]} />
-				</BarChart>
-			</ResponsiveContainer>
+			<div className="relative">
+				{/* Error/No Data Overlay */}
+				{(noData || error) && (
+					<div className="absolute inset-0 flex items-center justify-center z-10 bg-neutral-950/80 rounded-lg">
+						<div className="text-center">
+							{error ? (
+								<>
+									<p className="text-red-400 text-sm mb-2">⚠️ {error}</p>
+								</>
+							) : (
+								<>
+									<p className="text-gray-400 text-sm mb-2">No EEG data available</p>
+									<p className="text-gray-500 text-xs italic">
+										{mode === 'live'
+											? 'Waiting for live data stream...'
+											: `No data found for the selected time period`}
+									</p>
+								</>
+							)}
+						</div>
+					</div>
+				)}
+
+				<ResponsiveContainer width="100%" height={300}>
+					<BarChart data={data} margin={{ top: 8, right: 16, bottom: 60, left: 16 }}>
+						<CartesianGrid strokeDasharray="3 3" stroke="#333" />
+						<XAxis
+							dataKey="name"
+							stroke="#666"
+							tick={{ fontSize: 9 }}
+							angle={-35}
+							textAnchor="end"
+							interval={0}
+						/>
+						<YAxis stroke="#666" tickFormatter={(v) => v.toFixed(2)} />
+						<Tooltip
+							contentStyle={{ backgroundColor: '#111', border: 'none', color: '#fff' }}
+							labelStyle={{ color: '#fff' }}
+							itemStyle={{ color: '#fff' }}
+							formatter={(value: any) => [value.toFixed(3), 'Value']}
+						/>
+						<Legend />
+						<Bar dataKey="value" barSize={50} radius={[8, 8, 0, 0]}>
+							{data.map((_, index) => {
+								const colors = noData
+									? ['#7b61ff33', '#3b82f633', '#00ffa333', '#ff730033', '#fbbf2433']
+									: ['#7b61ff', '#3b82f6', '#00ffa3', '#ff7300', '#fbbf24']
+								return <Cell key={`cell-${index}`} fill={colors[index]} />
+							})}
+						</Bar>
+					</BarChart>
+				</ResponsiveContainer>
+			</div>
 
 			<p className="text-center text-gray-400 text-sm mt-2">
 				{mode === 'live'

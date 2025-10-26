@@ -16,14 +16,19 @@ interface EEGSample {
 	timestamp: number
 	alpha: number
 	beta: number
+	theta: number
 	beta_alpha_ratio: number
+	beta_theta_ratio: number
 }
+
+type MetricMode = 'alpha-beta' | 'theta-beta'
 
 export default function EEGChart() {
 	const [data, setData] = useState<EEGSample[]>([])
 	const [visibleRange, setVisibleRange] = useState(60 * 5) // default: 5 minutes
 	const [rangeUnit, setRangeUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('minutes')
 	const [mode, setMode] = useState<'live' | 'past'>('live')
+	const [metricMode, setMetricMode] = useState<MetricMode>('alpha-beta')
 
 	// --- Fetch initial + stream data ---
 	useEffect(() => {
@@ -44,7 +49,9 @@ export default function EEGChart() {
 					timestamp: new Date(r.created_at ?? Date.now()).getTime(),
 					alpha: r.alpha ?? 0,
 					beta: r.beta ?? 0,
+					theta: r.theta ?? 0,
 					beta_alpha_ratio: r.beta_alpha_ratio ?? 0,
+					beta_theta_ratio: r.beta_theta_ratio ?? 0,
 				}))
 				setData(formatted)
 			}
@@ -66,7 +73,9 @@ export default function EEGChart() {
 							timestamp: ts,
 							alpha: record.alpha ?? 0,
 							beta: record.beta ?? 0,
+							theta: record.theta ?? 0,
 							beta_alpha_ratio: record.beta_alpha_ratio ?? 0,
+							beta_theta_ratio: record.beta_theta_ratio ?? 0,
 						},
 					])
 				}
@@ -107,7 +116,9 @@ export default function EEGChart() {
 			timestamp: now - (50 - i) * 1000,
 			alpha: 0,
 			beta: 0,
+			theta: 0,
 			beta_alpha_ratio: 0,
+			beta_theta_ratio: 0,
 		}))
 	}
 
@@ -129,7 +140,17 @@ export default function EEGChart() {
 		<div className="w-full h-full flex flex-col bg-neutral-950 rounded-xl border border-neutral-800 p-3 relative">
 			{/* Header */}
 			<div className="flex justify-between items-center mb-2">
-				<h2 className="text-sm text-gray-300">EEG Activity (α / β / Ratio)</h2>
+				<div className="flex items-center gap-2">
+					<h2 className="text-sm text-gray-300">EEG Activity</h2>
+					<select
+						value={metricMode}
+						onChange={(e) => setMetricMode(e.target.value as MetricMode)}
+						className="bg-neutral-900 text-gray-300 text-xs rounded-md px-2 py-1 border border-neutral-700"
+					>
+						<option value="alpha-beta">α / β / Ratio</option>
+						<option value="theta-beta">θ / β / Ratio</option>
+					</select>
+				</div>
 				<div className="flex gap-2">
 					<button
 						onClick={() => setMode('live')}
@@ -204,33 +225,67 @@ export default function EEGChart() {
 						]}
 					/>
 					<Legend />
-					<Line
-						yAxisId="left"
-						type="monotone"
-						dataKey="alpha"
-						stroke={noData ? '#7b61ff33' : '#7b61ff'}
-						dot={false}
-						strokeWidth={2}
-						name="Alpha"
-					/>
-					<Line
-						yAxisId="left"
-						type="monotone"
-						dataKey="beta"
-						stroke={noData ? '#00ffa333' : '#00ffa3'}
-						dot={false}
-						strokeWidth={2}
-						name="Beta"
-					/>
-					<Line
-						yAxisId="left"
-						type="monotone"
-						dataKey="beta_alpha_ratio"
-						stroke={noData ? '#ff730033' : '#ff7300'}
-						dot={false}
-						strokeWidth={2}
-						name="β/α Ratio"
-					/>
+					{metricMode === 'alpha-beta' ? (
+						<>
+							<Line
+								yAxisId="left"
+								type="monotone"
+								dataKey="alpha"
+								stroke={noData ? '#7b61ff33' : '#7b61ff'}
+								dot={false}
+								strokeWidth={2}
+								name="Alpha (α)"
+							/>
+							<Line
+								yAxisId="left"
+								type="monotone"
+								dataKey="beta"
+								stroke={noData ? '#00ffa333' : '#00ffa3'}
+								dot={false}
+								strokeWidth={2}
+								name="Beta (β)"
+							/>
+							<Line
+								yAxisId="left"
+								type="monotone"
+								dataKey="beta_alpha_ratio"
+								stroke={noData ? '#ff730033' : '#ff7300'}
+								dot={false}
+								strokeWidth={2}
+								name="β/α Ratio"
+							/>
+						</>
+					) : (
+						<>
+							<Line
+								yAxisId="left"
+								type="monotone"
+								dataKey="theta"
+								stroke={noData ? '#7b61ff33' : '#7b61ff'}
+								dot={false}
+								strokeWidth={2}
+								name="Theta (θ)"
+							/>
+							<Line
+								yAxisId="left"
+								type="monotone"
+								dataKey="beta"
+								stroke={noData ? '#00ffa333' : '#00ffa3'}
+								dot={false}
+								strokeWidth={2}
+								name="Beta (β)"
+							/>
+							<Line
+								yAxisId="left"
+								type="monotone"
+								dataKey="beta_theta_ratio"
+								stroke={noData ? '#ff730033' : '#ff7300'}
+								dot={false}
+								strokeWidth={2}
+								name="β/θ Ratio"
+							/>
+						</>
+					)}
 				</LineChart>
 			</div>
 
