@@ -5,6 +5,8 @@
 Serenity is a **wearable EEG-based feedback and analytics system** designed to help caregivers and autistic individuals detect, understand, and manage stress in real time.  
 By translating brainwave data into calming audio-visual experiences, Serenity bridges the gap between neuroscience and emotional support.
 
+[![Watch the video](https://img.youtube.com/vi/DHx8ftQUy-c/0.jpg)](https://www.youtube.com/watch?v=DHx8ftQUy-c)
+
 ---
 
 ## Problem
