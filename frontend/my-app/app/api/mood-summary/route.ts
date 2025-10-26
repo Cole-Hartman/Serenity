@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 	const start = new Date(now)
 	start.setHours(now.getHours() - hours)
 
-	// --- Fetch EEG data ---
+	// Fetch EEG data
 	const { data: rows, error } = await supabase
 		.from('brain_data')
 		.select('alpha,beta,beta_alpha_ratio,created_at')
@@ -28,12 +28,9 @@ export async function POST(req: Request) {
 		.order('created_at', { ascending: true })
 
 	if (error || !rows?.length) {
-		return NextResponse.json({
-			text: `No EEG data available for the past ${range}.`,
-		})
+		return NextResponse.json({ text: `No EEG data available for the past ${range}.` })
 	}
 
-	// --- Compute averages ---
 	const avg = (key: 'alpha' | 'beta' | 'beta_alpha_ratio') =>
 		rows.reduce((sum, r) => sum + (r[key] ?? 0), 0) / rows.length
 
@@ -41,26 +38,22 @@ export async function POST(req: Request) {
 	const beta = avg('beta')
 	const ratio = avg('beta_alpha_ratio')
 
-	// --- Validate API key ---
 	const apiKey = process.env.ANTHROPIC_API_KEY
 	if (!apiKey) {
 		return NextResponse.json({ text: 'Server missing Anthropic API key.' })
 	}
 
-	// --- Build prompt using external file ---
 	const prompt = serenityPrompt(range, alpha, beta, ratio)
 
-	// --- Claude request helper ---
 	async function callClaude(model: string) {
-		const headers: HeadersInit = {
-			'Content-Type': 'application/json',
-			'x-api-key': apiKey,
-			'anthropic-version': '2023-06-01',
-		}
-
 		const res = await fetch('https://api.anthropic.com/v1/messages', {
 			method: 'POST',
-			headers,
+
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
+				'anthropic-version': '2023-06-01',
+			} as HeadersInit,
 			body: JSON.stringify({
 				model,
 				max_tokens: 300,
@@ -68,21 +61,17 @@ export async function POST(req: Request) {
 			}),
 		})
 
-		if (!res.ok) {
-			throw new Error(`Claude API error ${res.status}`)
-		}
-
+		if (!res.ok) throw new Error(`Claude API error ${res.status}`)
 		const data = await res.json()
 		return data?.content?.[0]?.text ?? 'No response text.'
 	}
 
-	// --- Try main model, then fallback ---
 	try {
 		const text = await callClaude('claude-sonnet-4-5-20250929')
 		return NextResponse.json({ text })
 	} catch {
-		const fallback = await callClaude('claude-haiku-4-5-20251001').catch(
-			() => 'Unable to retrieve summary from Claude.'
+		const fallback = await callClaude('claude-haiku-4-5-20251001').catch(() =>
+			'Unable to retrieve summary from Claude.'
 		)
 		return NextResponse.json({ text: fallback })
 	}
