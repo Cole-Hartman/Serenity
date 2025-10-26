@@ -13,13 +13,21 @@ export default function DashboardPage() {
 	return (
 		<main className="h-screen w-screen bg-black text-white flex flex-col items-center overflow-hidden">
 			{/* Header */}
-			<header className="relative w-full max-w-7xl px-4 pt-4 pb-2 flex flex-col">
+			<header className="relative w-full max-w-7xl px-4 pt-4 pb-2 flex flex-col items-center">
 				{/* Back to Home Button */}
 				<button
 					onClick={() => router.push('/')}
 					className="absolute top-4 left-4 bg-neutral-900 hover:bg-purple-600 text-gray-300 hover:text-white text-xs px-3 py-1 rounded-md border border-neutral-700 transition-colors"
 				>
 					← Back to Home
+				</button>
+
+				{/* Go to Serenity Button */}
+				<button
+					onClick={() => router.push('/serenity')}
+					className="absolute top-4 right-4 bg-neutral-900 hover:bg-purple-600 text-gray-300 hover:text-white text-xs px-3 py-1 rounded-md border border-neutral-700 transition-colors"
+				>
+					Go to Serenity →
 				</button>
 
 				<h1 className="text-3xl font-semibold tracking-tight mb-1 text-center">
@@ -67,3 +75,4 @@ export default function DashboardPage() {
 		</main>
 	)
 }
+
