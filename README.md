@@ -90,11 +90,6 @@ Serenity’s design draws from neuroscience and sensory research:
 
 ---
 
-## 🖥️ Demo
-> Coming soon — Serenity’s live dashboard and Serenity Mode will be showcased post-Cal Hacks 12.0 demo video release.
-
----
-
 ### ⭐ Support
 If you like this project, consider starring ⭐ it on GitHub or following the contributors!  
 
