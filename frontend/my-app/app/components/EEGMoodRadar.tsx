@@ -80,10 +80,20 @@ export default function EEGMoodRadar() {
 			</h2>
 
 			<ResponsiveContainer width="110%" height={390}>
-				<RadarChart cx="50%" cy="50%" outerRadius="75%" data={data}>
+				<RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
 					<PolarGrid stroke="#333" />
-					<PolarAngleAxis dataKey="mood" tick={{ fill: '#aaa', fontSize: 12 }} />
-					<PolarRadiusAxis angle={30} domain={[0, 250]} tick={{ fill: '#666' }} />
+					<PolarAngleAxis
+						dataKey="mood"
+						tick={{ fill: '#aaa', fontSize: 14 }}
+						tickSize={16}
+					/>
+					<PolarRadiusAxis
+						angle={18}
+						domain={[0, 'auto']}
+						tick={{ fill: '#666', fontSize: 12 }}
+						tickFormatter={(value) => value.toString()}
+						stroke="#444"
+					/>
 					<Tooltip
 						contentStyle={{
 							backgroundColor: '#111',

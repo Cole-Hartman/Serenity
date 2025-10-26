@@ -9,7 +9,6 @@ import {
 	YAxis,
 	CartesianGrid,
 	Tooltip,
-	Legend,
 	ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '@/lib/supabaseClient'
@@ -214,7 +213,6 @@ export default function EEGBarSummary() {
 						<XAxis
 							dataKey="name"
 							stroke="#666"
-							tick={{ fontSize: 9 }}
 							angle={-35}
 							textAnchor="end"
 							interval={0}
@@ -222,16 +220,35 @@ export default function EEGBarSummary() {
 						<YAxis stroke="#666" tickFormatter={(v) => v.toFixed(2)} />
 						<Tooltip
 							contentStyle={{ backgroundColor: '#111', border: 'none', color: '#fff' }}
-							labelStyle={{ color: '#fff' }}
-							itemStyle={{ color: '#fff' }}
-							formatter={(value: any) => [value.toFixed(3), 'Value']}
+							labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+							cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+							content={({ active, payload }) => {
+								if (active && payload && payload.length) {
+									const dataIndex = data.findIndex(d => d.name === payload[0].payload.name)
+									const colors = noData
+										? ['#7b61ff', '#7b61ff', '#00ffa3', '#ff7300', '#ff7300']
+										: ['#7b61ff', '#7b61ff', '#00ffa3', '#ff7300', '#ff7300']
+									const color = colors[dataIndex] || '#fff'
+
+									return (
+										<div style={{ backgroundColor: '#111', padding: '8px 12px', border: 'none', borderRadius: '4px' }}>
+											<p style={{ color: '#fff', margin: 0, marginBottom: '4px', fontWeight: 'bold' }}>
+												{payload[0].payload.name}
+											</p>
+											<p style={{ color: color, margin: 0, fontSize: '14px' }}>
+												{payload[0].value.toFixed(3)}
+											</p>
+										</div>
+									)
+								}
+								return null
+							}}
 						/>
-						<Legend />
-						<Bar dataKey="value" barSize={50} radius={[8, 8, 0, 0]}>
+						<Bar dataKey="value" barSize={50} radius={[8, 8, 0, 0]} name="">
 							{data.map((_, index) => {
 								const colors = noData
 									? ['#7b61ff33', '#3b82f633', '#00ffa333', '#ff730033', '#fbbf2433']
-									: ['#7b61ff', '#3b82f6', '#00ffa3', '#ff7300', '#fbbf24']
+									: ['#7b61ff', '#7b61ff', '#00ffa3', '#ff7300', '#ff7300']
 								return <Cell key={`cell-${index}`} fill={colors[index]} />
 							})}
 						</Bar>
