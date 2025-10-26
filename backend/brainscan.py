@@ -122,8 +122,7 @@ try:
                 continue
 
             # Skip if alpha is too low (likely complete signal loss or disconnection)
-            # Lowered threshold to 0.03 to accept eyes-open states (alpha naturally low)
-            if alpha < 0.03:
+            if alpha < 0.10:
                 print(f"⚠️  {electrode_name}: Alpha power too low ({alpha:.4f}), likely poor contact, skipping...")
                 continue
 
