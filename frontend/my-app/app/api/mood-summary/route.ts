@@ -50,9 +50,9 @@ export async function POST(req: Request) {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'x-api-key': apiKey,
+				'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
 				'anthropic-version': '2023-06-01',
-			},
+			} as HeadersInit,
 			body: JSON.stringify({
 				model,
 				max_tokens: 300,
