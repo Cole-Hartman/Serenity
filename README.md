@@ -1,4 +1,4 @@
-# 🧠 Serenity — Live Autism Stress Detection & Mitigation
+# Serenity — Live Autism Stress Detection & Mitigation
 
 **Developed by Mahdi Alsalami, Cole Hartman, and Andrew Le**
 
