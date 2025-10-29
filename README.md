@@ -36,8 +36,6 @@ Through **cognitive state mapping**, the system recognizes patterns of stress an
 
 ---
 
-## How It Works
-
 <img width="1142" height="640" alt="image" src="https://github.com/user-attachments/assets/f7aa1585-507e-478a-87a4-c6e5c2a199a0" />
 
 ## Impact
