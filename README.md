@@ -36,37 +36,11 @@ Through **cognitive state mapping**, the system recognizes patterns of stress an
 
 ---
 
-## ⚙️ How It Works
+## How It Works
 
-1. **Data Collection**  
-   - BrainFlow captures EEG signals from the Muse headband.  
-   - Supabase stores and streams this data in real time.
+<img width="1142" height="640" alt="image" src="https://github.com/user-attachments/assets/f7aa1585-507e-478a-87a4-c6e5c2a199a0" />
 
-2. **Analysis & AI**  
-   - Claude AI analyzes patterns to detect stress and map cognitive states.  
-   - AI sends adaptive response signals to libraries for visuals and sound.
-
-3. **Calming Output**  
-   - Howler.js → Generates adaptive soundscapes.  
-   - tsparticles → Creates floating, soothing visual effects.  
-   - Recharts → Displays EEG wave graphs and ratios.  
-   - BrainBrowser → Highlights active brain regions in 3D.  
-   - Next.js + Tailwind + Framer Motion → Smooth, accessible web experience.
-
----
-
-## 🧩 Tech Stack
-
-| Layer | Tools |
-|-------|-------|
-| **Backend** | BrainFlow, Supabase |
-| **AI** | Claude (Anthropic) |
-| **Libraries** | Howler.js, Recharts, tsparticles, BrainBrowser |
-| **Frontend** | Next.js, Tailwind CSS, Framer Motion |
-
----
-
-## 💫 Impact
+## Impact
 
 **For autistic individuals:**  
 - Reduces sensory overload through calming visuals and sounds.  
@@ -82,7 +56,7 @@ Through **cognitive state mapping**, the system recognizes patterns of stress an
 
 ---
 
-## 🔬 Research-Backed Design
+## Research-Backed Design
 
 Serenity’s design draws from neuroscience and sensory research:
 
