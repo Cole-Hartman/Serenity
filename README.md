@@ -1,6 +1,6 @@
 # 🧠 Serenity — Live Autism Stress Detection & Mitigation
 
-**Developed at Cal Hacks 12.0 by Mahdi Alsalami, Cole Hartman, and Andrew Le**
+**Developed by Mahdi Alsalami, Cole Hartman, and Andrew Le**
 
 Serenity is a **wearable EEG-based feedback and analytics system** designed to help caregivers and autistic individuals detect, understand, and manage stress in real time.  
 By translating brainwave data into calming audio-visual experiences, Serenity bridges the gap between neuroscience and emotional support.
